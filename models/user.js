@@ -27,12 +27,12 @@ const userSchema = mongoose.Schema(
             default: false
 
         },
-        products: [
-            {
-                type: mongoose.Schema.Types.ObjectId,
-                ref: 'product'
-            }
-        ]
+        // products: [
+        //     {
+        //         type: mongoose.Schema.Types.ObjectId,
+        //         ref: 'product'
+        //     }
+        // ]
     }
 )
 
