@@ -1,10 +1,12 @@
 const express = require('express');
 const router = express.Router();
-const { getProducts, createProduct, deleteProduct, updateProduct } = require('../controllers/productController');
+const { getProducts, createProduct, deleteProduct, updateProduct,searchProduct } = require('../controllers/productController');
 const { protect, admin } = require('../middleware/authMiddleware');
 
+router.get('/', getProducts); 
+router.get('/search', searchProduct);
 // Route: POST /api/products
-router.get('/', protect, admin, getProducts);
+// router.get('/', protect, admin, getProducts);//no need to admin or user to get or search
 router.post('/', protect, admin, createProduct);
 router.delete('/:id', protect, admin, deleteProduct);
 router.put('/:id', protect, admin, updateProduct);
