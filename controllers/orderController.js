@@ -5,6 +5,8 @@
 const Cart = require('../models/cart');
 const Order = require('../models/order');
 
+
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 const checkout = async (req, res) => {
     try {
         const userId = req.user._id;
@@ -59,6 +61,34 @@ const checkout = async (req, res) => {
     }
 };
 
+const payForOrder = async (req, res) => {
+    try {
+        const { orderId } = req.params.id;
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+        // / 2. The Math: Convert the Decimal128 price to a standard Number, then to Cents.
+        // Example: $50.00 * 100 = 5000 cents. Math.round prevents weird decimal errors.
+        const amountIncents = Math.round(parsefloat(order.totalPrice.toString()) * 100);
+        
+
+        // 3. The Secret Meeting: Ask Stripe for a "Payment Intent"
+        const paymentIntent = await stripe.paymentIntents.create({
+            amount: amountInCents,
+            currency: 'usd', // You can change this to 'inr' if you want!
+        });
+        res.status(200).json({
+            message: "Payment initiated successfully",
+            clientSecret: paymentIntent.client_secret
+        });
+
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
 module.exports = {
-    checkout
+    checkout,
+    payForOrder
 };

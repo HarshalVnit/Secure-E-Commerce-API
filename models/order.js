@@ -49,7 +49,7 @@ const orderSchema = new mongoose.Schema({
     }
 });
 
-// module.exports = mongoose.model('order', orderSchema);
+module.exports = mongoose.model('order', orderSchema);
 
 // However, in professional databases, "Order History" isn't an array that we store inside the User. Instead, "Order History" is just a Search Result.
 
