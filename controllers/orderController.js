@@ -42,14 +42,14 @@ const checkout = async (req, res) => {
                 price: item.product.price
             })),
             totalPrice: totalPrice,
-            isPaid: true,
-            paidAt: Date.now()
+            isPaid: false,
+            // paidAt: Date.now() we will confirm only afte stripe payment is successful
         });
 
         const savedOrder = await order.save();
         // Clear the user's cart
-        cart.cartItems = [];
-        await cart.save();
+        // cart.cartItems = [];
+        // await cart.save();
         res.status(201).json(savedOrder);
 
 
@@ -63,14 +63,14 @@ const checkout = async (req, res) => {
 
 const payForOrder = async (req, res) => {
     try {
-        const { orderId } = req.params.id;
+        const orderId  = req.params.id;
         const order = await Order.findById(orderId);
         if (!order) {
             return res.status(404).json({ message: 'Order not found' });
         }
         // / 2. The Math: Convert the Decimal128 price to a standard Number, then to Cents.
         // Example: $50.00 * 100 = 5000 cents. Math.round prevents weird decimal errors.
-        const amountIncents = Math.round(parsefloat(order.totalPrice.toString()) * 100);
+        const amountInCents = Math.round(parseFloat(order.totalPrice.toString()) * 100);
         
 
         // 3. The Secret Meeting: Ask Stripe for a "Payment Intent"
@@ -88,7 +88,38 @@ const payForOrder = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+const updateOrderToPaid = async (req, res) => {
+    try {
+        // 1. Find the order we just paid for
+        const order = await Order.findById(req.params.id);
+
+        if (!order) {
+            return res.status(404).json({ message: 'Order not found' });
+        }
+
+        // 2. Mark the order as successfully paid!
+        order.isPaid = true;
+        order.paidAt = Date.now();
+        
+        // Save the updated receipt
+        const updatedOrder = await order.save();
+
+        // 3. Find the user's cart and FINALLY empty it
+        const cart = await Cart.findOne({ owner: req.user._id });
+        if (cart) {
+            cart.cartItems = [];
+            await cart.save();
+        }
+
+        // 4. Send the final, paid receipt back to the frontend
+        res.status(200).json(updatedOrder);
+
+    } catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+};
 module.exports = {
     checkout,
-    payForOrder
+    payForOrder,
+    updateOrderToPaid
 };

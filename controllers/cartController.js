@@ -9,7 +9,7 @@
 
 const Cart = require('../models/cart');
 // const Product = require('../models/product');
-
+const Product = require('../models/product');
 const addToCart = async (req, res) => {
     try {
         const userId = req.user._id; 
