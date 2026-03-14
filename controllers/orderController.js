@@ -118,8 +118,23 @@ const updateOrderToPaid = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+// Just keep one thing in mind for the future: If the StoreBoss ever completely deletes a product from the database, .populate() will return null for that item. That is exactly why we saved the name and price directly in the Order model! Even if the original product is deleted from the store, the customer's receipt will still safely show "Pro Gaming Mouse - $50".
+const getMyOrders = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const orders = await Order.find({ user: userId }).populate('orderItems.product');
+        //this populate mean that for every order, look at the orderItems array, and for each item in that array, look at the product field, and replace that product ID with the full product details from the Product collection. So instead of just getting back a product ID, we get back the entire product object with all its details (name, price, description, etc.) in each order item. This way, when we send the orders back to the frontend, it has all the information it needs to display the order history properly.
+        res.status(200).json(orders);
+    }
+    catch(error)
+    {
+res.status(500).json({ message: error.message });
+    }
+}
 module.exports = {
     checkout,
     payForOrder,
-    updateOrderToPaid
+    updateOrderToPaid,
+    getMyOrders
 };

@@ -1,6 +1,6 @@
 
 const product=require('../models/product');
-
+const review = require('../models/review');
 // Create a new product
 
 const getProducts = async (req, res) => {
@@ -104,6 +104,54 @@ const searchProduct = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 };
+
+const createProductReview = async (req, res) => {
+    try {
+        const userId = req.user._id;
+        const { productId } = req.params;
+        const { rating, comment } = req.body;
+        //first check if producvt exist or first check if user ha successfully paid or not you have to anyways check both
+        //but if products not even exist then checking paid or not is useless
+        const product = await Product.findById(productId);
+        if (!product) {
+            return res.status(404).json({ message: 'Product not found' });
+        }
+        // Check if the user has already reviewed this product
+        const alreadyReviewed = review.findOne({ user: userId, product: productId });
+        if (alreadyReviewed) {
+            return res.status(400).json({ message: 'You have already reviewed this product' });
+        }
+        //now check if user has paid ort not
+        const hasPaid = await Order.findOne({ user: userId, 'orderItems.product': productId, isPaid: true });
+        if (!hasPaid) {
+            return res.status(400).json({ message: 'You can only review products you have purchased' });
+        }
+        // If all checks pass, create the review
+        const newReview = new review({
+            user: userId,
+            product: productId,
+            name: req.user.name, // Assuming you have the user's name in the req.user object
+            rating,
+            comment
+        });
+        const savedReview = await newReview.save();
+        // Update the product's average rating and number of reviews
+        //now we will just add this rating and add+1 in num so find myid and then update
+        //i will nto perform average every time its complex i will just divide once when asked
+        const updatedproduct = await Product.findByIdAndUpdate(productId, {
+            $inc: { numReviews: 1 }, // Increment the number of reviews by 1
+            $set: {
+                rating: product.rating + rating
+            }
+        }, { new: true });
+        res.status(201).json(savedReview);
+
+
+    }
+    catch (error) {
+        res.status(500).json({ message: error.message });
+    }
+}
 
 module.exports = {
     getProducts,
