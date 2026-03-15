@@ -1,11 +1,12 @@
 
-const product=require('../models/product');
-const review = require('../models/review');
+const Product=require('../models/product');
+const Review = require('../models/review');
 // Create a new product
+const Order = require('../models/order');
 
 const getProducts = async (req, res) => {
     try {
-        const products = await product.find();
+        const products = await Product.find();
         res.json(products);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -17,7 +18,7 @@ const getProducts = async (req, res) => {
 const createProduct = async (req, res) => {
     try {
         const { name, description, price, stock, category } = req.body;
-        const newProduct = new product({
+        const newProduct = new Product({
             name,
             description,
             price,
@@ -35,7 +36,7 @@ const createProduct = async (req, res) => {
 const deleteProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const deletedProduct = await product.findByIdAndDelete(id);
+        const deletedProduct = await Product.findByIdAndDelete(id);
         if (!deletedProduct) {
 
             return res.status(404).json({ message: "Product not found" });
@@ -53,7 +54,7 @@ const updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
         const { name, description, price, stock, category } = req.body;
-        const updatedProduct = await product.findByIdAndUpdate(
+        const updatedProduct = await Product.findByIdAndUpdate(
             id,
              { name, description, price, stock, category },//what things are updated
             { new: true }
@@ -95,7 +96,7 @@ const searchProduct = async (req, res) => {
         // 2. THE SEARCH: 
         // If there was no keyword, searchLogic is {}, so it finds all products.
         // If there WAS a keyword, searchLogic looks like { name: { $regex: 'laptop', $options: 'i' } }
-        const products = await product.find(searchLogic);
+        const products = await Product.find(searchLogic);
 
         // 3. THE RESPONSE:
         res.status(200).json(products);
@@ -108,7 +109,7 @@ const searchProduct = async (req, res) => {
 const createProductReview = async (req, res) => {
     try {
         const userId = req.user._id;
-        const { productId } = req.params;
+        const productId  = req.params.id;//because in rout we are naming var as id so explicite we have to do this naito waha router me /:productId kar do.
         const { rating, comment } = req.body;
         //first check if producvt exist or first check if user ha successfully paid or not you have to anyways check both
         //but if products not even exist then checking paid or not is useless
@@ -117,17 +118,17 @@ const createProductReview = async (req, res) => {
             return res.status(404).json({ message: 'Product not found' });
         }
         // Check if the user has already reviewed this product
-        const alreadyReviewed = review.findOne({ user: userId, product: productId });
+        const alreadyReviewed =await Review.findOne({ user: userId, product: productId });
         if (alreadyReviewed) {
             return res.status(400).json({ message: 'You have already reviewed this product' });
         }
         //now check if user has paid ort not
-        const hasPaid = await Order.findOne({ user: userId, 'orderItems.product': productId, isPaid: true });
+        const hasPaid = await Order.findOne({ user: userId, 'orderItems.product': productId, isPaid: true });//see explaination below[$1]
         if (!hasPaid) {
             return res.status(400).json({ message: 'You can only review products you have purchased' });
         }
         // If all checks pass, create the review
-        const newReview = new review({
+        const newReview = new Review({
             user: userId,
             product: productId,
             name: req.user.name, // Assuming you have the user's name in the req.user object
@@ -138,10 +139,13 @@ const createProductReview = async (req, res) => {
         // Update the product's average rating and number of reviews
         //now we will just add this rating and add+1 in num so find myid and then update
         //i will nto perform average every time its complex i will just divide once when asked
+        //but no customer gives review10 times per day only but customer visits product incredibly more times so its better to just add rating and divide when asked
+        // so when vidited we have to compute averqae mre time so it is better to compute itwhile giving Reviews
+product.rating= (product.rating * product.numReviews + Number(rating)) / (product.numReviews + 1); 
         const updatedproduct = await Product.findByIdAndUpdate(productId, {
             $inc: { numReviews: 1 }, // Increment the number of reviews by 1
             $set: {
-                rating: product.rating + rating
+                rating: product.rating
             }
         }, { new: true });
         res.status(201).json(savedReview);
@@ -152,13 +156,34 @@ const createProductReview = async (req, res) => {
         res.status(500).json({ message: error.message });
     }
 }
+//explaination for [$1]:
+// The Plain JavaScript Way (What you were thinking):
+// If you had an array of orders in memory, you would have to write this:
 
+// JavaScript
+// const hasPaid = orders.find((order) => {
+//     // 1. Match the user
+//     // 2. Check if paid
+//     // 3. LOOP through the array to find the product
+//     return order.user === userId && 
+//            order.isPaid === true && 
+//            order.orderItems.some(item => item.product.toString() === productId); 
+// });
+// The MongoDB "Dot Notation" Magic:
+// MongoDB knows that looping through arrays in JavaScript is slow. So, they built a feature directly into the database engine called Dot Notation.
+
+// When you write 'orderItems.product': productId in a Mongoose query, you are triggering a built-in C++ loop deep inside MongoDB.
+// It translates to: "Look at the orderItems array. Does any single object inside this array have a product field that matches this ID?"
+
+// It does the loop for you, and it does it 100x faster than JavaScript can. That is why we use that simple, beautiful one-liner!
 module.exports = {
     getProducts,
     createProduct,
     deleteProduct,
     updateProduct,
-    searchProduct
+    searchProduct,
+    createProductReview
+
 };
 
    
