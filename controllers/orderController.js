@@ -132,9 +132,79 @@ const getMyOrders = async (req, res) => {
 res.status(500).json({ message: error.message });
     }
 }
+
+const getAdminDashboard = async (req, res) => 
+    {
+    try
+    {
+        const totalOrders = await Order.countDocuments();
+        const totalUsers = await User.countDocuments();
+        const revenueData = await Order.aggregate([
+            {
+                $match: { isPaid: true }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalRevenue: { $sum: "$totalPrice" }
+                }
+            }
+        ]);
+
+        res.status(200).json({ 
+            "totalorders": totalOrders,
+            "totalusers": totalUsers,
+            "totalrevenue": revenueData[0] ? revenueData[0].totalRevenue : 0
+        })  ;
+        
+        
+    }
+    catch (error)
+    {
+        res.status(500).json({ message: error.message });
+    }
+}
 module.exports = {
     checkout,
     payForOrder,
     updateOrderToPaid,
-    getMyOrders
+    getMyOrders,
+    getAdminDashboard
 };
+    
+// aggregation pipeline explanation for revenueData:
+//     Think of the aggregate() function as a literal factory assembly line (a conveyor belt).
+
+// If you use find(), MongoDB just grabs a bunch of boxes (documents) and throws them at your Node.js server. Node.js then has to open every box and do the math. If you have 1 million orders, your server crashes.
+
+// With aggregate(), you send the math instructions into the database itself. MongoDB does the heavy lifting on its ultra-fast C++ servers, and only hands your Node.js server the final, single answer.
+
+// You pass an array [] into aggregate() because you are giving the factory a list of "Stages" (machines on the assembly line).
+
+// Stage 1: $match (The Filter)
+// JavaScript
+// { $match: { isPaid: true } }
+// Imagine 1,000 Order documents rolling down the conveyor belt.
+// The $match machine is a bouncer. It looks at every order.
+
+// "Are you paid? No? Get off the belt."
+
+// "Are you paid? Yes? Keep moving forward."
+
+// Only the orders where isPaid is strictly true survive this stage and move to the next machine.
+
+// Stage 2: $group (The Accountant)
+// JavaScript
+// { 
+//     $group: { 
+//         _id: null, 
+//         totalRevenue: { $sum: "$totalPrice" } 
+//     } 
+// }
+// Now, only the successful, paid orders arrive at the $group machine.
+
+// _id: null: The $group machine usually groups things by category (e.g., _id: "$category" would give you separate totals for "Electronics" vs "Clothing"). By saying _id: null, we are telling the machine: "I don't care about categories. Smash every single order on this belt into one giant, single pile."
+
+// totalRevenue: { $sum: "$totalPrice" }: Now that they are in one giant pile, create a new label called totalRevenue. Go into every order, find the $totalPrice field, extract the number, and add ($sum) them all together.
+
+// The machine spits out one final object: { _id: null, totalRevenue: 5000 }.
